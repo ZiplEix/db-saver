@@ -12,9 +12,9 @@ db-saver
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Data & Config directories
-data/
-config/
+# Data & Config directories (root only)
+/data/
+/config/
 *.db
 *.db-journal
 
