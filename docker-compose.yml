@@ -5,13 +5,13 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      - PORT=8080
-      - ADMIN_USER=admin
-      - ADMIN_PASSWORD=change_this_secret_password
-      - DATA_DIR=/data
-      - RCLONE_CONFIG_PATH=/config/rclone.conf
-      - TMP_BACKUP_DIR=/data/tmp
-      - TZ=Europe/Paris
+      - PORT=${PORT:-8080}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - DATA_DIR=${DATA_DIR:-/data}
+      - RCLONE_CONFIG_PATH=${RCLONE_CONFIG_PATH:-/config/rclone.conf}
+      - TMP_BACKUP_DIR=${TMP_BACKUP_DIR:-/data/tmp}
+      - TZ=${TZ:-Europe/Paris}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /opt/db-saver/data:/data
