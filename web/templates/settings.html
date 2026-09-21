@@ -8,6 +8,33 @@
   </div>
 </div>
 
+{{if .Error}}
+  <div class="toast toast-error" style="margin-bottom: 24px;">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>{{.Error}}</span>
+  </div>
+{{end}}
+
+{{if .Saved}}
+  <div class="toast toast-success" style="margin-bottom: 24px;">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+    </svg>
+    <span>Paramètres de notifications enregistrés avec succès !</span>
+  </div>
+{{end}}
+
+{{if .RcloneSaved}}
+  <div class="toast toast-success" style="margin-bottom: 24px;">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+    </svg>
+    <span>Configuration rclone (rclone.conf) enregistrée avec succès !</span>
+  </div>
+{{end}}
+
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start;">
   <!-- Notifications Settings -->
   <div class="card">

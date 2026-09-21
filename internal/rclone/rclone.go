@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -31,17 +33,27 @@ func NewRcloneService(configPath string) *RcloneService {
 	}
 }
 
+// resolveConfigPath returns the actual file path to rclone.conf
+// If configPath is a directory (e.g. Docker auto-created it or mounted directory), it appends rclone.conf
+func (r *RcloneService) resolveConfigPath() string {
+	if fi, err := os.Stat(r.configPath); err == nil && fi.IsDir() {
+		return filepath.Join(r.configPath, "rclone.conf")
+	}
+	return r.configPath
+}
+
 // GetConfigPath returns the current path to rclone.conf
 func (r *RcloneService) GetConfigPath() string {
-	return r.configPath
+	return r.resolveConfigPath()
 }
 
 // ReadConfigFile returns the raw content of rclone.conf
 func (r *RcloneService) ReadConfigFile() (string, error) {
-	if _, err := os.Stat(r.configPath); os.IsNotExist(err) {
+	target := r.resolveConfigPath()
+	if _, err := os.Stat(target); os.IsNotExist(err) {
 		return "", nil
 	}
-	bytes, err := os.ReadFile(r.configPath)
+	bytes, err := os.ReadFile(target)
 	if err != nil {
 		return "", err
 	}
@@ -50,12 +62,18 @@ func (r *RcloneService) ReadConfigFile() (string, error) {
 
 // SaveConfigFile writes the content into rclone.conf
 func (r *RcloneService) SaveConfigFile(content string) error {
-	return os.WriteFile(r.configPath, []byte(content), 0600)
+	target := r.resolveConfigPath()
+	// Ensure parent directory exists
+	if dir := filepath.Dir(target); dir != "" && dir != "." {
+		_ = os.MkdirAll(dir, 0755)
+	}
+	log.Printf("[Rclone] Enregistrement de rclone.conf vers %s (%d octets)", target, len(content))
+	return os.WriteFile(target, []byte(content), 0600)
 }
 
 // ListRemotes executes `rclone listremotes` and returns remote names (without trailing colon)
 func (r *RcloneService) ListRemotes(ctx context.Context) ([]string, error) {
-	cmd := exec.CommandContext(ctx, "rclone", "listremotes", "--config", r.configPath)
+	cmd := exec.CommandContext(ctx, "rclone", "listremotes", "--config", r.resolveConfigPath())
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list remotes: %w", err)
@@ -75,7 +93,7 @@ func (r *RcloneService) ListRemotes(ctx context.Context) ([]string, error) {
 // TestRemote checks if a remote is reachable
 func (r *RcloneService) TestRemote(ctx context.Context, remote string) error {
 	target := remote + ":"
-	cmd := exec.CommandContext(ctx, "rclone", "lsd", target, "--config", r.configPath, "--max-depth", "1")
+	cmd := exec.CommandContext(ctx, "rclone", "lsd", target, "--config", r.resolveConfigPath(), "--max-depth", "1")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s: %w", string(out), err)
@@ -86,7 +104,7 @@ func (r *RcloneService) TestRemote(ctx context.Context, remote string) error {
 // Upload sends a file to remote:remotePath/filename
 func (r *RcloneService) Upload(ctx context.Context, localPath, remote, remotePath, filename string, logWriter io.Writer) error {
 	dest := fmt.Sprintf("%s:%s/%s", remote, strings.Trim(remotePath, "/"), filename)
-	cmd := exec.CommandContext(ctx, "rclone", "copyto", localPath, dest, "--config", r.configPath, "-v")
+	cmd := exec.CommandContext(ctx, "rclone", "copyto", localPath, dest, "--config", r.resolveConfigPath(), "-v")
 
 	if logWriter != nil {
 		cmd.Stdout = logWriter
@@ -102,7 +120,7 @@ func (r *RcloneService) Upload(ctx context.Context, localPath, remote, remotePat
 // Download fetches a file from remote:remotePath/filename to localPath
 func (r *RcloneService) Download(ctx context.Context, remote, remotePath, filename, localPath string, logWriter io.Writer) error {
 	src := fmt.Sprintf("%s:%s/%s", remote, strings.Trim(remotePath, "/"), filename)
-	cmd := exec.CommandContext(ctx, "rclone", "copyto", src, localPath, "--config", r.configPath, "-v")
+	cmd := exec.CommandContext(ctx, "rclone", "copyto", src, localPath, "--config", r.resolveConfigPath(), "-v")
 
 	if logWriter != nil {
 		cmd.Stdout = logWriter
@@ -118,7 +136,7 @@ func (r *RcloneService) Download(ctx context.Context, remote, remotePath, filena
 // ListBackups lists backup files stored in remote:remotePath
 func (r *RcloneService) ListBackups(ctx context.Context, remote, remotePath string) ([]RemoteItem, error) {
 	target := fmt.Sprintf("%s:%s", remote, strings.Trim(remotePath, "/"))
-	cmd := exec.CommandContext(ctx, "rclone", "lsjson", target, "--config", r.configPath)
+	cmd := exec.CommandContext(ctx, "rclone", "lsjson", target, "--config", r.resolveConfigPath())
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list backups: %w", err)
@@ -181,7 +199,7 @@ func (r *RcloneService) ApplyRetention(ctx context.Context, remote, remotePath s
 		if logWriter != nil {
 			fmt.Fprintf(logWriter, "[Retention] Suppressing old backup: %s\n", targetFile)
 		}
-		cmd := exec.CommandContext(ctx, "rclone", "deletefile", targetFile, "--config", r.configPath)
+		cmd := exec.CommandContext(ctx, "rclone", "deletefile", targetFile, "--config", r.resolveConfigPath())
 		var errBuf bytes.Buffer
 		cmd.Stderr = &errBuf
 		if err := cmd.Run(); err != nil {

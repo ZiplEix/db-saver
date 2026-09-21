@@ -640,12 +640,17 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	rcloneConfig, _ := h.rcloneSvc.ReadConfigFile()
 	remotes, _ := h.rcloneSvc.ListRemotes(r.Context())
 
+	saved := r.URL.Query().Get("saved") == "true"
+	rcloneSaved := r.URL.Query().Get("rclone_saved") == "true"
+
 	h.renderPage(w, "settings.html", map[string]interface{}{
 		"ActiveTab":        "settings",
 		"Settings":         settings,
 		"RcloneConfig":     rcloneConfig,
 		"RcloneConfigPath": h.rcloneSvc.GetConfigPath(),
 		"Remotes":          remotes,
+		"Saved":            saved,
+		"RcloneSaved":      rcloneSaved,
 	})
 }
 
@@ -669,8 +674,7 @@ func (h *Handler) HandleSaveSettings(w http.ResponseWriter, r *http.Request) {
 
 	_ = h.db.SaveSettings(settings)
 
-	w.Header().Set("HX-Redirect", "/settings?saved=true")
-	w.WriteHeader(http.StatusOK)
+	http.Redirect(w, r, "/settings?saved=true", http.StatusSeeOther)
 }
 
 func (h *Handler) HandleSaveRcloneConfig(w http.ResponseWriter, r *http.Request) {
@@ -681,12 +685,21 @@ func (h *Handler) HandleSaveRcloneConfig(w http.ResponseWriter, r *http.Request)
 
 	content := r.FormValue("rclone_conf")
 	if err := h.rcloneSvc.SaveConfigFile(content); err != nil {
-		http.Error(w, "Erreur enregistrement rclone.conf: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("[Rclone Error] Erreur enregistrement rclone.conf: %v", err)
+		settings, _ := h.db.GetSettings()
+		remotes, _ := h.rcloneSvc.ListRemotes(r.Context())
+		h.renderPage(w, "settings.html", map[string]interface{}{
+			"ActiveTab":        "settings",
+			"Settings":         settings,
+			"RcloneConfig":     content,
+			"RcloneConfigPath": h.rcloneSvc.GetConfigPath(),
+			"Remotes":          remotes,
+			"Error":            "Erreur lors de l'enregistrement de rclone.conf : " + err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("HX-Redirect", "/settings?rclone_saved=true")
-	w.WriteHeader(http.StatusOK)
+	http.Redirect(w, r, "/settings?rclone_saved=true", http.StatusSeeOther)
 }
 
 func (h *Handler) HandleTestNotification(w http.ResponseWriter, r *http.Request) {
