@@ -9,7 +9,7 @@
       </button>
     </div>
 
-    <form method="POST" action="{{if .IsEdit}}/jobs/{{.Job.ID}}{{else}}/jobs{{end}}">
+    <form method="POST" action="{{if .IsEdit}}/jobs/{{.Job.ID}}{{else}}/jobs{{end}}" hx-post="{{if .IsEdit}}/jobs/{{.Job.ID}}{{else}}/jobs{{end}}">
       <div class="modal-body">
         <!-- Job Name -->
         <div class="form-group">

@@ -403,8 +403,12 @@ func (h *Handler) HandleJobCreate(w http.ResponseWriter, r *http.Request) {
 
 	_ = h.sched.SyncJob(job)
 
-	w.Header().Set("HX-Redirect", "/")
-	w.WriteHeader(http.StatusOK)
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (h *Handler) HandleJobUpdate(w http.ResponseWriter, r *http.Request) {
@@ -458,8 +462,12 @@ func (h *Handler) HandleJobUpdate(w http.ResponseWriter, r *http.Request) {
 
 	_ = h.sched.SyncJob(job)
 
-	w.Header().Set("HX-Redirect", "/")
-	w.WriteHeader(http.StatusOK)
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (h *Handler) HandleJobDelete(w http.ResponseWriter, r *http.Request) {
