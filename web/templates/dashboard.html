@@ -1,0 +1,270 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Tableau de bord</h1>
+    <p class="page-subtitle">Gérez et surveillez la sauvegarde de vos bases de données</p>
+  </div>
+
+  <button class="btn btn-primary" hx-get="/jobs/new" hx-target="#modal-container">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+    </svg>
+    Nouveau job de sauvegarde
+  </button>
+</div>
+
+<!-- Metrics Cards -->
+<div class="metrics-grid">
+  <div class="metric-card">
+    <div class="metric-icon icon-blue">
+      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+      </svg>
+    </div>
+    <div class="metric-data">
+      <div class="metric-value">{{.TotalJobs}}</div>
+      <div class="metric-label">Jobs configurés</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon icon-purple">
+      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </div>
+    <div class="metric-data">
+      <div class="metric-value">{{.ActiveJobs}}</div>
+      <div class="metric-label">Jobs actifs (planifiés)</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon icon-green">
+      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </div>
+    <div class="metric-data">
+      <div class="metric-value">{{.SuccessfulBackups}}</div>
+      <div class="metric-label">Derniers succès</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon icon-red">
+      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </div>
+    <div class="metric-data">
+      <div class="metric-value">{{.FailedBackups}}</div>
+      <div class="metric-label">Échecs récents</div>
+    </div>
+  </div>
+</div>
+
+<!-- Configured Jobs -->
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+      Tâches de sauvegarde
+    </h2>
+  </div>
+
+  <div class="table-container">
+    {{if .Jobs}}
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Nom / Conteneur</th>
+            <th>Type</th>
+            <th>Fréquence</th>
+            <th>Destination rclone</th>
+            <th>Rétention</th>
+            <th>Dernier statut</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Jobs}}
+            <tr>
+              <td>
+                <div style="font-weight: 700; font-size: 0.95rem;">{{.Name}}</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono);">
+                  {{.ContainerName}}
+                </div>
+              </td>
+              <td>
+                {{if eq .DBType "postgres"}}
+                  <span class="badge badge-postgres">PostgreSQL</span>
+                {{else}}
+                  <span class="badge badge-sqlite">SQLite</span>
+                {{end}}
+              </td>
+              <td>
+                <div style="font-weight: 600;">{{presetLabel .SchedulePreset}}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">
+                  {{.ScheduleCron}}
+                </div>
+              </td>
+              <td>
+                <div style="font-weight: 600; font-family: var(--font-mono); font-size: 0.85rem;">
+                  {{.RcloneRemote}}:{{.RclonePath}}
+                </div>
+              </td>
+              <td>
+                <div style="font-size: 0.85rem;">
+                  {{if gt .RetentionCount 0}}{{.RetentionCount}} copies{{else}}Illimité{{end}}
+                  {{if gt .RetentionDays 0}}<span style="color: var(--text-muted);">/ {{.RetentionDays}}j</span>{{end}}
+                </div>
+              </td>
+              <td>
+                {{if eq .LastRunStatus "success"}}
+                  <span class="badge badge-success">Succès</span>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                    {{formatTime .LastRunAt}} ({{formatDuration .LastRunDuration}} &bull; {{formatBytes .LastRunSize}})
+                  </div>
+                {{else if eq .LastRunStatus "failed"}}
+                  <span class="badge badge-failed">Échec</span>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                    {{formatTime .LastRunAt}} ({{formatDuration .LastRunDuration}})
+                  </div>
+                {{else if eq .LastRunStatus "running"}}
+                  <span class="badge badge-running">En cours...</span>
+                {{else}}
+                  <span class="badge badge-pending">En attente</span>
+                {{end}}
+              </td>
+              <td>
+                <div class="actions-group" style="justify-content: flex-end;">
+                  <!-- Run Now -->
+                  <button class="btn btn-primary btn-sm" title="Sauvegarder maintenant"
+                          hx-post="/jobs/run/{{.ID}}" hx-target="#modal-container">
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Sauvegarder
+                  </button>
+
+                  <!-- Backups List & Restore -->
+                  <button class="btn btn-secondary btn-sm" title="Sauvegardes & Restauration"
+                          hx-get="/jobs/backups/{{.ID}}" hx-target="#modal-container">
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Backups
+                  </button>
+
+                  <!-- Logs -->
+                  <button class="btn btn-secondary btn-sm" title="Consulter les logs"
+                          hx-get="/jobs/logs-modal/{{.ID}}" hx-target="#modal-container">
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </button>
+
+                  <!-- Edit -->
+                  <button class="btn btn-secondary btn-sm" title="Modifier"
+                          hx-get="/jobs/edit/{{.ID}}" hx-target="#modal-container">
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+
+                  <!-- Delete -->
+                  <button class="btn btn-danger btn-sm" title="Supprimer"
+                          hx-delete="/jobs/delete/{{.ID}}" hx-confirm="Voulez-vous vraiment supprimer ce job de sauvegarde ?">
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {{end}}
+        </tbody>
+      </table>
+    {{else}}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+        </div>
+        <div class="empty-title">Aucun job de sauvegarde configuré</div>
+        <p class="empty-desc">
+          Commencez par ajouter votre premier conteneur de base de données à sauvegarder.
+        </p>
+        <button class="btn btn-primary" hx-get="/jobs/new" hx-target="#modal-container">
+          Configurer un job
+        </button>
+      </div>
+    {{end}}
+  </div>
+</div>
+
+<!-- Recent History -->
+{{if .RecentHistory}}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      Historique récent des exécutions
+    </h2>
+  </div>
+
+  <div class="table-container">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Tâche</th>
+          <th>Statut</th>
+          <th>Taille</th>
+          <th>Durée</th>
+          <th>Déclenchement</th>
+          <th>Fichier généré</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .RecentHistory}}
+          <tr>
+            <td style="font-size: 0.85rem; color: var(--text-secondary);">{{formatTime .CreatedAt}}</td>
+            <td style="font-weight: 600;">{{.JobName}}</td>
+            <td>
+              {{if eq .Status "success"}}
+                <span class="badge badge-success">Succès</span>
+              {{else if eq .Status "failed"}}
+                <span class="badge badge-failed">Échec</span>
+              {{else}}
+                <span class="badge badge-running">En cours</span>
+              {{end}}
+            </td>
+            <td>{{formatBytes .SizeBytes}}</td>
+            <td>{{formatDuration .DurationMs}}</td>
+            <td>
+              <span class="badge badge-pending">
+                {{if eq .TriggerType "manual"}}Manuel{{else if eq .TriggerType "test"}}Test{{else}}Planifié{{end}}
+              </span>
+            </td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary);">
+              {{.Filename}}
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
+{{end}}

@@ -1,0 +1,135 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Paramètres & Configuration</h1>
+    <p class="page-subtitle">Configurez les alertes webhooks et la synchronisation avec rclone</p>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start;">
+  <!-- Notifications Settings -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        Notifications & Alertes
+      </h2>
+    </div>
+
+    <div class="card-body">
+      <div id="notification-result"></div>
+
+      <form method="POST" action="/settings/save">
+        <!-- Discord -->
+        <div class="form-group">
+          <label class="form-label" for="discord_webhook_url">URL Webhook Discord</label>
+          <input class="form-control" type="url" id="discord_webhook_url" name="discord_webhook_url"
+                 value="{{if .Settings}}{{.Settings.DiscordWebhookURL}}{{end}}"
+                 placeholder="https://discord.com/api/webhooks/...">
+          <div class="form-hint">Envoie un embed riche avec les détails de la sauvegarde.</div>
+        </div>
+
+        <!-- Telegram -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="telegram_bot_token">Token Bot Telegram</label>
+            <input class="form-control" type="text" id="telegram_bot_token" name="telegram_bot_token"
+                   value="{{if .Settings}}{{.Settings.TelegramBotToken}}{{end}}"
+                   placeholder="123456789:ABCdefGhI...">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="telegram_chat_id">Chat ID Telegram</label>
+            <input class="form-control" type="text" id="telegram_chat_id" name="telegram_chat_id"
+                   value="{{if .Settings}}{{.Settings.TelegramChatID}}{{end}}"
+                   placeholder="12345678 ou @channel">
+          </div>
+        </div>
+
+        <!-- Generic Webhook -->
+        <div class="form-group">
+          <label class="form-label" for="generic_webhook_url">Webhook JSON Générique</label>
+          <input class="form-control" type="url" id="generic_webhook_url" name="generic_webhook_url"
+                 value="{{if .Settings}}{{.Settings.GenericWebhookURL}}{{end}}"
+                 placeholder="https://mon-serveur.com/api/backup-event">
+          <div class="form-hint">Envoie une requête POST avec un payload JSON structuré.</div>
+        </div>
+
+        <!-- Triggers -->
+        <div class="form-group">
+          <label class="form-label">Déclencheurs</label>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <label class="form-check">
+              <input type="checkbox" name="notify_on_success" {{if and .Settings .Settings.NotifyOnSuccess}}checked{{end}}>
+              <span>Notifier lors d'une sauvegarde réussie</span>
+            </label>
+            <label class="form-check">
+              <input type="checkbox" name="notify_on_failure" {{if and .Settings .Settings.NotifyOnFailure}}checked{{end}}>
+              <span>Notifier en cas d'échec de sauvegarde (recommandé)</span>
+            </label>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">
+            Enregistrer les notifications
+          </button>
+          <button type="button" class="btn btn-secondary"
+                  hx-post="/settings/test-notification" hx-target="#notification-result">
+            Tester l'envoi
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Rclone Config Editor -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
+        </svg>
+        Configuration rclone (rclone.conf)
+      </h2>
+    </div>
+
+    <div class="card-body">
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">
+          Fichier : <code>{{.RcloneConfigPath}}</code>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Remotes détectés :</span>
+          {{if .Remotes}}
+            {{range .Remotes}}
+              <span class="badge badge-success">{{.}}</span>
+            {{end}}
+          {{else}}
+            <span class="badge badge-pending">Aucun remote</span>
+          {{end}}
+        </div>
+      </div>
+
+      <form method="POST" action="/settings/rclone">
+        <div class="form-group">
+          <label class="form-label" for="rclone_conf">Contenu de rclone.conf</label>
+          <textarea class="form-control" id="rclone_conf" name="rclone_conf" rows="14"
+                    placeholder="[my-remote]&#10;type = s3&#10;provider = AWS&#10;...">{{.RcloneConfig}}</textarea>
+          <div class="form-hint">
+            Vous pouvez coller ici le contenu de votre <code>rclone.conf</code> généré via <code>rclone config</code> sur votre machine.
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px;">
+          Enregistrer rclone.conf
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

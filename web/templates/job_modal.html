@@ -1,0 +1,222 @@
+<div class="modal-overlay" onclick="if(event.target === this) closeModal()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title">{{if .IsEdit}}Modifier le job de sauvegarde{{else}}Nouveau job de sauvegarde{{end}}</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal()">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <form method="POST" action="{{if .IsEdit}}/jobs/{{.Job.ID}}{{else}}/jobs{{end}}">
+      <div class="modal-body">
+        <!-- Job Name -->
+        <div class="form-group">
+          <label class="form-label" for="job_name">Nom de la sauvegarde *</label>
+          <input class="form-control" type="text" id="job_name" name="name"
+                 value="{{if .Job.Name}}{{.Job.Name}}{{else if .PrefillContainer}}{{.PrefillContainer.Name}} Backup{{end}}"
+                 placeholder="Ex: Mon Application - Production" required>
+        </div>
+
+        <!-- Container Selection -->
+        <div class="form-group">
+          <label class="form-label" for="container_select">Conteneur Docker cible *</label>
+          <select class="form-control" id="container_select" name="container_id" required onchange="handleContainerChange(this)">
+            <option value="">-- Sélectionnez un conteneur --</option>
+            {{range .Containers}}
+              <option value="{{.ID}}"
+                      data-name="{{.Name}}"
+                      data-dbtype="{{.DetectedDB}}"
+                      data-pguser="{{.PostgresUser}}"
+                      data-pgdb="{{.PostgresDB}}"
+                      data-sqlite="{{if .PotentialSQLiteFiles}}{{index .PotentialSQLiteFiles 0}}{{end}}"
+                      {{if and $.PrefillContainer (eq $.PrefillContainer.ID .ID)}}selected{{else if and $.Job (eq $.Job.ContainerID .ID)}}selected{{end}}>
+                {{.Name}} ({{.ShortID}} - {{.Image}})
+              </option>
+            {{end}}
+          </select>
+          <input type="hidden" id="container_name" name="container_name" value="{{if .Job.ContainerName}}{{.Job.ContainerName}}{{else if .PrefillContainer}}{{.PrefillContainer.Name}}{{end}}">
+        </div>
+
+        <!-- Database Type -->
+        <div class="form-group">
+          <label class="form-label" for="db_type">Type de base de données *</label>
+          <select class="form-control" id="db_type" name="db_type" required onchange="toggleDBSettings(this.value)">
+            <option value="postgres" {{if eq .Job.DBType "postgres"}}selected{{else if and .PrefillContainer (eq .PrefillContainer.DetectedDB "postgres")}}selected{{end}}>PostgreSQL</option>
+            <option value="sqlite" {{if eq .Job.DBType "sqlite"}}selected{{else if and .PrefillContainer (eq .PrefillContainer.DetectedDB "sqlite")}}selected{{end}}>SQLite (Fichier .db)</option>
+          </select>
+        </div>
+
+        <!-- Postgres Specific Fields -->
+        <div id="postgres_fields" style="display: {{if eq .Job.DBType "sqlite"}}none{{else}}block{{end}};">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="postgres_db">Nom de la base</label>
+              <input class="form-control" type="text" id="postgres_db" name="postgres_db"
+                     value="{{if .Job.PostgresDB}}{{.Job.PostgresDB}}{{else if .PrefillContainer}}{{.PrefillContainer.PostgresDB}}{{end}}"
+                     placeholder="Ex: postgres">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="postgres_user">Utilisateur</label>
+              <input class="form-control" type="text" id="postgres_user" name="postgres_user"
+                     value="{{if .Job.PostgresUser}}{{.Job.PostgresUser}}{{else if .PrefillContainer}}{{.PrefillContainer.PostgresUser}}{{end}}"
+                     placeholder="Ex: postgres">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="postgres_password">Mot de passe (si requis)</label>
+              <input class="form-control" type="password" id="postgres_password" name="postgres_password"
+                     value="{{if .Job.PostgresPassword}}{{.Job.PostgresPassword}}{{else if .PrefillContainer}}{{.PrefillContainer.PostgresPassword}}{{end}}"
+                     placeholder="Mot de passe PostgreSQL">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="postgres_port">Port</label>
+              <input class="form-control" type="number" id="postgres_port" name="postgres_port"
+                     value="{{if gt .Job.PostgresPort 0}}{{.Job.PostgresPort}}{{else}}5432{{end}}">
+            </div>
+          </div>
+        </div>
+
+        <!-- SQLite Specific Fields -->
+        <div id="sqlite_fields" style="display: {{if eq .Job.DBType "sqlite"}}block{{else}}none{{end}};">
+          <div class="form-group">
+            <label class="form-label" for="sqlite_path">Chemin du fichier .db dans le conteneur *</label>
+            <input class="form-control" type="text" id="sqlite_path" name="sqlite_path"
+                   value="{{if .Job.SQLitePath}}{{.Job.SQLitePath}}{{else if and .PrefillContainer .PrefillContainer.PotentialSQLiteFiles}}{{index .PrefillContainer.PotentialSQLiteFiles 0}}{{end}}"
+                   placeholder="Ex: /data/app.db ou /var/lib/sqlite/data.sqlite">
+            <div class="form-hint">Le chemin absolu vers le fichier SQLite à l'intérieur du conteneur applicatif.</div>
+          </div>
+        </div>
+
+        <!-- Rclone Destination -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="rclone_remote">Remote rclone *</label>
+            <select class="form-control" id="rclone_remote" name="rclone_remote" required>
+              <option value="">-- Choisir un remote --</option>
+              {{range .Remotes}}
+                <option value="{{.}}" {{if eq $.Job.RcloneRemote .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+            {{if not .Remotes}}
+              <div class="form-hint" style="color: var(--accent-amber);">
+                ⚠️ Aucun remote rclone détecté. Configurez votre <code>rclone.conf</code> dans les Paramètres.
+              </div>
+            {{end}}
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="rclone_path">Dossier de destination rclone *</label>
+            <input class="form-control" type="text" id="rclone_path" name="rclone_path"
+                   value="{{if .Job.RclonePath}}{{.Job.RclonePath}}{{else}}backups/{{end}}"
+                   placeholder="Ex: backups/my-app" required>
+          </div>
+        </div>
+
+        <!-- Schedule -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="schedule_preset">Fréquence de sauvegarde *</label>
+            <select class="form-control" id="schedule_preset" name="schedule_preset" required onchange="handlePresetChange(this.value)">
+              <option value="hourly" {{if eq .Job.SchedulePreset "hourly"}}selected{{end}}>Toutes les heures</option>
+              <option value="every_6h" {{if eq .Job.SchedulePreset "every_6h"}}selected{{end}}>Toutes les 6 heures</option>
+              <option value="every_12h" {{if eq .Job.SchedulePreset "every_12h"}}selected{{end}}>Toutes les 12 heures</option>
+              <option value="daily_3am" {{if or (eq .Job.SchedulePreset "daily_3am") (not .Job.SchedulePreset)}}selected{{end}}>Tous les jours à 03h00</option>
+              <option value="weekly" {{if eq .Job.SchedulePreset "weekly"}}selected{{end}}>Toutes les semaines (Dimanche 03h00)</option>
+              <option value="custom" {{if eq .Job.SchedulePreset "custom"}}selected{{end}}>Personnalisé (Cron libre)</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="cron_field" style="display: {{if eq .Job.SchedulePreset "custom"}}block{{else}}none{{end}};">
+            <label class="form-label" for="schedule_cron">Expression Cron</label>
+            <input class="form-control" type="text" id="schedule_cron" name="schedule_cron"
+                   value="{{if .Job.ScheduleCron}}{{.Job.ScheduleCron}}{{else}}0 3 * * *{{end}}"
+                   placeholder="0 3 * * *">
+            <div class="form-hint">Syntaxe standard 5 champs : minute heure jour mois jour-semaine</div>
+          </div>
+        </div>
+
+        <!-- Retention -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="retention_count">Rétention (Nombre de sauvegardes)</label>
+            <input class="form-control" type="number" id="retention_count" name="retention_count"
+                   value="{{if gt .Job.RetentionCount 0}}{{.Job.RetentionCount}}{{else}}7{{end}}" min="0">
+            <div class="form-hint">Conserver les N plus récents (0 = illimité)</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="retention_days">Rétention (Jours max)</label>
+            <input class="form-control" type="number" id="retention_days" name="retention_days"
+                   value="{{if gt .Job.RetentionDays 0}}{{.Job.RetentionDays}}{{else}}30{{end}}" min="0">
+            <div class="form-hint">Supprimer les fichiers plus vieux que X jours (0 = illimité)</div>
+          </div>
+        </div>
+
+        <!-- Enabled -->
+        <div class="form-check" style="margin-top: 10px;">
+          <input type="checkbox" id="job_enabled" name="enabled" {{if or .Job.Enabled (not .IsEdit)}}checked{{end}}>
+          <label for="job_enabled" style="font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+            Activer la planification automatique
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">
+          {{if .IsEdit}}Enregistrer les modifications{{else}}Créer la tâche de sauvegarde{{end}}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function toggleDBSettings(type) {
+    const pgFields = document.getElementById('postgres_fields');
+    const sqliteFields = document.getElementById('sqlite_fields');
+    if (type === 'postgres') {
+      pgFields.style.display = 'block';
+      sqliteFields.style.display = 'none';
+    } else {
+      pgFields.style.display = 'none';
+      sqliteFields.style.display = 'block';
+    }
+  }
+
+  function handlePresetChange(val) {
+    const cronField = document.getElementById('cron_field');
+    cronField.style.display = (val === 'custom') ? 'block' : 'none';
+  }
+
+  function handleContainerChange(select) {
+    const opt = select.options[select.selectedIndex];
+    if (!opt || !opt.value) return;
+
+    document.getElementById('container_name').value = opt.getAttribute('data-name') || '';
+
+    const dbType = opt.getAttribute('data-dbtype');
+    if (dbType === 'postgres' || dbType === 'sqlite') {
+      document.getElementById('db_type').value = dbType;
+      toggleDBSettings(dbType);
+    }
+
+    if (dbType === 'postgres') {
+      const pgUser = opt.getAttribute('data-pguser');
+      const pgDb = opt.getAttribute('data-pgdb');
+      if (pgUser) document.getElementById('postgres_user').value = pgUser;
+      if (pgDb) document.getElementById('postgres_db').value = pgDb;
+    } else if (dbType === 'sqlite') {
+      const sqlitePath = opt.getAttribute('data-sqlite');
+      if (sqlitePath) document.getElementById('sqlite_path').value = sqlitePath;
+    }
+
+    const jobName = document.getElementById('job_name');
+    if (!jobName.value) {
+      jobName.value = (opt.getAttribute('data-name') || 'App') + ' Backup';
+    }
+  }
+</script>

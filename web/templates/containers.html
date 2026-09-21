@@ -1,0 +1,112 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Conteneurs Docker détectés</h1>
+    <p class="page-subtitle">Découvrez automatiquement les conteneurs PostgreSQL et SQLite actifs sur votre serveur</p>
+  </div>
+</div>
+
+{{if .Error}}
+  <div class="toast toast-error">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+    <span>Erreur de connexion au socket Docker (/var/run/docker.sock) : {{.Error}}</span>
+  </div>
+{{end}}
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+      Conteneurs disponibles ({{len .Containers}})
+    </h2>
+  </div>
+
+  <div class="table-container">
+    {{if .Containers}}
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Nom du conteneur</th>
+            <th>ID / Image</th>
+            <th>Statut</th>
+            <th>Détection Base</th>
+            <th>Détails détectés</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Containers}}
+            <tr>
+              <td>
+                <div style="font-weight: 700; font-size: 0.95rem;">{{.Name}}</div>
+              </td>
+              <td>
+                <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary);">
+                  {{.ShortID}}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  {{.Image}}
+                </div>
+              </td>
+              <td>
+                {{if eq .State "running"}}
+                  <span class="badge badge-success">Running</span>
+                {{else}}
+                  <span class="badge badge-pending">{{.State}}</span>
+                {{end}}
+              </td>
+              <td>
+                {{if eq .DetectedDB "postgres"}}
+                  <span class="badge badge-postgres">PostgreSQL</span>
+                {{else if eq .DetectedDB "sqlite"}}
+                  <span class="badge badge-sqlite">SQLite probable</span>
+                {{else}}
+                  <span class="badge badge-pending">Non détecté</span>
+                {{end}}
+              </td>
+              <td>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                  {{if eq .DetectedDB "postgres"}}
+                    <span>User: <code>{{.PostgresUser}}</code> &bull; DB: <code>{{.PostgresDB}}</code></span>
+                  {{else if .PotentialSQLiteFiles}}
+                    <span>Chemin suggéré: <code>{{index .PotentialSQLiteFiles 0}}</code></span>
+                  {{else}}
+                    <span style="color: var(--text-muted);">{{len .Mounts}} volume(s) monté(s)</span>
+                  {{end}}
+                </div>
+              </td>
+              <td style="text-align: right;">
+                <button class="btn btn-primary btn-sm"
+                        hx-get="/jobs/new?container_id={{.ID}}" hx-target="#modal-container">
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Sauvegarder
+                </button>
+              </td>
+            </tr>
+          {{end}}
+        </tbody>
+      </table>
+    {{else}}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="empty-title">Aucun conteneur Docker détecté</div>
+        <p class="empty-desc">
+          Vérifiez que le socket Docker <code>/var/run/docker.sock</code> est correctement monté dans le conteneur db-saver.
+        </p>
+      </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

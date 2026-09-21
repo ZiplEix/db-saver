@@ -1,0 +1,102 @@
+<div class="modal-overlay" onclick="if(event.target === this) closeModal()">
+  <div class="modal-content" style="max-width: 780px;">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Sauvegardes distantes &bull; {{.Job.Name}}</h3>
+        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; font-family: var(--font-mono);">
+          Destination: <code>{{.Job.RcloneRemote}}:{{.Job.RclonePath}}</code>
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal()">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      {{if .RcloneErr}}
+        <div class="toast toast-error">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>Erreur rclone : {{.RcloneErr}}</span>
+        </div>
+      {{end}}
+
+      {{if .Backups}}
+        <div class="table-container">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Fichier de sauvegarde</th>
+                <th>Taille</th>
+                <th>Date de modification</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .Backups}}
+                <tr>
+                  <td>
+                    <div style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600;">
+                      {{.Name}}
+                    </div>
+                  </td>
+                  <td>{{formatBytes .Size}}</td>
+                  <td style="font-size: 0.85rem; color: var(--text-secondary);">
+                    {{formatTime .ModTime}}
+                  </td>
+                  <td>
+                    <div class="actions-group" style="justify-content: flex-end;">
+                      <!-- Download -->
+                      <a href="/jobs/download?job_id={{$.Job.ID}}&file={{.Name}}"
+                         class="btn btn-secondary btn-sm" title="Télécharger l'archive">
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Télécharger
+                      </a>
+
+                      <!-- Restore -->
+                      <button class="btn btn-danger btn-sm" title="Restaurer cette sauvegarde"
+                              hx-post="/jobs/restore"
+                              hx-vals='{"job_id": "{{$.Job.ID}}", "filename": "{{.Name}}"}'
+                              hx-target="#modal-container"
+                              hx-confirm="⚠️ ATTENTION : Êtes-vous sûr de vouloir restaurer '{{.Name}}' dans le conteneur '{{$.Job.ContainerName}}' ? Les données actuelles seront remplacées !">
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Restaurer
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      {{else}}
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+          </div>
+          <div class="empty-title">Aucune sauvegarde trouvée sur le remote</div>
+          <p class="empty-desc">
+            Le dossier distant <code>{{.Job.RclonePath}}</code> ne contient aucun fichier de sauvegarde pour le moment.
+          </p>
+          <button class="btn btn-primary"
+                  hx-post="/jobs/run/{{.Job.ID}}" hx-target="#modal-container">
+            Lancer une première sauvegarde
+          </button>
+        </div>
+      {{end}}
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Fermer</button>
+    </div>
+  </div>
+</div>
